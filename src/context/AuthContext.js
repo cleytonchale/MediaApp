@@ -18,10 +18,21 @@ export const AuthProvider = ({ children }) => {
         if (t) {
           setToken(t);
           try {
-            const decoded = jwtDecode(t);
-            setUser({ id: decoded.sub, username: decoded.username || decoded.sub });
+            // Buscar dados completos do usuário
+            const meResponse = await axios.get(`${API_BASE}/auth/me`, {
+              headers: { Authorization: `Bearer ${t}` }
+            });
+            console.log('[AUTH] Carregando dados do usuário:', meResponse.data);
+            setUser(meResponse.data);
           } catch(e) {
-            setUser(null);
+            console.error('[AUTH] Erro ao carregar dados do usuário:', e);
+            // Fallback: usar dados do token
+            try {
+              const decoded = jwtDecode(t);
+              setUser({ id: decoded.sub, username: decoded.username || decoded.sub });
+            } catch(decodeError) {
+              setUser(null);
+            }
           }
         }
       } catch (e) {
@@ -36,12 +47,21 @@ export const AuthProvider = ({ children }) => {
     setToken(t);
     await AsyncStorage.setItem('@media_token', t);
     try {
-      const decoded = jwtDecode(t);
-      console.log('[AUTH] Token decodificado:', decoded);
-      setUser({ id: decoded.sub, username: decoded.username || decoded.sub });
+      // Buscar dados completos do usuário
+      const meResponse = await axios.get(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${t}` }
+      });
+      console.log('[AUTH] Dados do usuário:', meResponse.data);
+      setUser(meResponse.data);
     } catch(e) {
-      console.error('[AUTH] Erro ao decodificar token:', e);
-      setUser(null);
+      console.error('[AUTH] Erro ao buscar dados do usuário:', e);
+      // Fallback: usar dados do token se /auth/me falhar
+      try {
+        const decoded = jwtDecode(t);
+        setUser({ id: decoded.sub, username: decoded.username || decoded.sub });
+      } catch(decodeError) {
+        setUser(null);
+      }
     }
   };
 
