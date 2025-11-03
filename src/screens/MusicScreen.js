@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as MediaLibrary from 'expo-media-library';
 import { AuthContext } from '../context/AuthContext';
 import { PlayerContext } from '../context/PlayerContext';
 import axios from 'axios';
@@ -68,15 +67,7 @@ export default function MusicScreen({ navigation }) {
     try {
       console.log('[UPLOAD] Iniciando seleção de arquivo...');
       
-      // Pedir permissão para acessar mídia
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permissão negada', 'Precisa de permissão para acessar mídia do dispositivo');
-        setUploading(false);
-        return;
-      }
-      
-      // Primeiro tentar DocumentPicker
+      // Usar DocumentPicker - mais simples e confiável
       const pickerResult = await DocumentPicker.getDocumentAsync({
         type: ['audio/*', '*/*'],
         copyToCacheDirectory: true,
@@ -84,46 +75,21 @@ export default function MusicScreen({ navigation }) {
 
       console.log('[UPLOAD] Picker result:', JSON.stringify(pickerResult));
       
-      let file = null;
-      
-      // Verificar formato de retorno do DocumentPicker
-      if (pickerResult.assets && pickerResult.assets.length > 0) {
-        file = pickerResult.assets[0];
-      } else if (pickerResult.uri && !pickerResult.canceled) {
-        file = pickerResult;
-      } else if (!pickerResult.canceled) {
-        // Tentar MediaLibrary como fallback
-        const albums = await MediaLibrary.getAlbumsAsync();
-        const audioAlbums = albums.filter(album => album.assetCount > 0);
-        
-        if (audioAlbums.length === 0) {
-          Alert.alert('Nenhuma música encontrada', 'Não há músicas na galeria do dispositivo');
-          setUploading(false);
-          return;
-        }
-        
-        const assets = await MediaLibrary.getAssetsAsync({
-          album: audioAlbums[0],
-          mediaType: MediaLibrary.MediaType.audio,
-          first: 50,
-        });
-        
-        if (assets.assets.length === 0) {
-          Alert.alert('Nenhuma música encontrada');
-          setUploading(false);
-          return;
-        }
-        
-        // Usar primeiro arquivo como exemplo
-        const mediaAsset = assets.assets[0];
-        file = {
-          uri: mediaAsset.uri,
-          name: mediaAsset.filename || 'audio.mp3',
-          mimeType: 'audio/mpeg',
-        };
-      } else {
+      // Verificar se cancelou
+      if (pickerResult.canceled) {
         setUploading(false);
         return;
+      }
+      
+      let file = null;
+      
+      // Verificar formato de retorno do DocumentPicker v14
+      if (pickerResult.assets && pickerResult.assets.length > 0) {
+        file = pickerResult.assets[0];
+      } else if (pickerResult.uri) {
+        file = pickerResult;
+      } else {
+        throw new Error('Arquivo inválido selecionado');
       }
       
       console.log('[UPLOAD] Arquivo selecionado:', file.name, file.mimeType, 'URI:', file.uri);

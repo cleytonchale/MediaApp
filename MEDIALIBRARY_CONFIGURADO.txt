@@ -1,0 +1,37 @@
+========================================
+  MEDIALIBRARY CONFIGURADO ✅
+========================================
+
+O QUE FOI FEITO:
+
+✅ Instalado expo-media-library
+✅ Adicionado import nos arquivos
+✅ Implementado fallback duplo:
+   1. DocumentPicker (principal)
+   2. MediaLibrary (fallback)
+
+COMO FUNCIONA:
+
+1. Primeiro tenta DocumentPicker
+2. Se não funcionar, usa MediaLibrary
+3. Pede permissão automático
+4. Acessa galeria do dispositivo
+
+VANTAGENS:
+
+✅ DocumentPicker funciona
+✅ MediaLibrary como backup
+✅ Aceita qualquer formato
+✅ Acessa galeria completa
+
+========================================
+
+TESTAR:
+
+1. Aguardar deploy (2-3 min)
+2. Recarregar app
+3. Tentar upload
+4. Verificar logs
+
+========================================
+

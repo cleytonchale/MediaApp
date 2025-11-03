@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as MediaLibrary from 'expo-media-library';
 import { AuthContext } from '../context/AuthContext';
 import { PlayerContext } from '../context/PlayerContext';
 import axios from 'axios';
@@ -67,15 +66,7 @@ export default function VideoScreen({ navigation }) {
     try {
       console.log('[UPLOAD] Iniciando seleção de arquivo...');
       
-      // Pedir permissão para acessar mídia
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permissão negada', 'Precisa de permissão para acessar mídia do dispositivo');
-        setUploading(false);
-        return;
-      }
-      
-      // Primeiro tentar DocumentPicker
+      // Usar DocumentPicker - mais simples e confiável
       const pickerResult = await DocumentPicker.getDocumentAsync({
         type: ['video/*', '*/*'],
         copyToCacheDirectory: true,
@@ -83,46 +74,21 @@ export default function VideoScreen({ navigation }) {
 
       console.log('[UPLOAD] Picker result:', JSON.stringify(pickerResult));
       
-      let file = null;
-      
-      // Verificar formato de retorno do DocumentPicker
-      if (pickerResult.assets && pickerResult.assets.length > 0) {
-        file = pickerResult.assets[0];
-      } else if (pickerResult.uri && !pickerResult.canceled) {
-        file = pickerResult;
-      } else if (!pickerResult.canceled) {
-        // Tentar MediaLibrary como fallback
-        const albums = await MediaLibrary.getAlbumsAsync();
-        const videoAlbums = albums.filter(album => album.assetCount > 0);
-        
-        if (videoAlbums.length === 0) {
-          Alert.alert('Nenhum vídeo encontrado', 'Não há vídeos na galeria do dispositivo');
-          setUploading(false);
-          return;
-        }
-        
-        const assets = await MediaLibrary.getAssetsAsync({
-          album: videoAlbums[0],
-          mediaType: MediaLibrary.MediaType.video,
-          first: 50,
-        });
-        
-        if (assets.assets.length === 0) {
-          Alert.alert('Nenhum vídeo encontrado');
-          setUploading(false);
-          return;
-        }
-        
-        // Usar primeiro arquivo como exemplo
-        const mediaAsset = assets.assets[0];
-        file = {
-          uri: mediaAsset.uri,
-          name: mediaAsset.filename || 'video.mp4',
-          mimeType: 'video/mp4',
-        };
-      } else {
+      // Verificar se cancelou
+      if (pickerResult.canceled) {
         setUploading(false);
         return;
+      }
+      
+      let file = null;
+      
+      // Verificar formato de retorno do DocumentPicker v14
+      if (pickerResult.assets && pickerResult.assets.length > 0) {
+        file = pickerResult.assets[0];
+      } else if (pickerResult.uri) {
+        file = pickerResult;
+      } else {
+        throw new Error('Arquivo inválido selecionado');
       }
       
       console.log('[UPLOAD] Arquivo selecionado:', file.name, file.mimeType, 'URI:', file.uri);
