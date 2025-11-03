@@ -214,11 +214,15 @@ async def upload_musica(
 ):
     """Upload de uma música"""
     
-    print(f"\n=== UPLOAD MÚSICA RECEBIDO ===")
+    print(f"\n{'='*60}")
+    print(f"=== UPLOAD MÚSICA RECEBIDO ===")
+    print(f"{'='*60}")
     print(f"Arquivo: {file.filename}")
     print(f"Título: {titulo}")
     print(f"Artista: {artista}")
     print(f"Usuário: {current_user.username}")
+    import sys
+    sys.stdout.flush()  # Forçar flush para aparecer nos logs
     
     # Validar extensão
     allowed_extensions = {'.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg'}
@@ -335,6 +339,15 @@ async def upload_video(
     db: Session = Depends(get_db)
 ):
     """Upload de um vídeo"""
+    
+    print(f"\n{'='*60}")
+    print(f"=== UPLOAD VÍDEO RECEBIDO ===")
+    print(f"{'='*60}")
+    print(f"Arquivo: {file.filename}")
+    print(f"Título: {titulo}")
+    print(f"Usuário: {current_user.username}")
+    import sys
+    sys.stdout.flush()  # Forçar flush para aparecer nos logs
     
     # Validar extensão
     allowed_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm'}
