@@ -2,10 +2,9 @@ import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import jwtDecode from 'jwt-decode';
+import API_BASE from '../config';
 
-export const AuthContext = createContext();
-
-const API_BASE = 'http://10.168.62.170:8000'; 
+export const AuthContext = createContext(); 
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
@@ -38,8 +37,10 @@ export const AuthProvider = ({ children }) => {
     await AsyncStorage.setItem('@media_token', t);
     try {
       const decoded = jwtDecode(t);
+      console.log('[AUTH] Token decodificado:', decoded);
       setUser({ id: decoded.sub, username: decoded.username || decoded.sub });
     } catch(e) {
+      console.error('[AUTH] Erro ao decodificar token:', e);
       setUser(null);
     }
   };

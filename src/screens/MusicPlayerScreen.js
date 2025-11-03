@@ -13,8 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { PlayerContext } from '../context/PlayerContext';
 import { AuthContext } from '../context/AuthContext';
 import { colors, typography, spacing } from '../theme';
-
-const API_BASE = 'http://10.168.62.170:8000';
+import API_BASE from '../config';
 
 export default function MusicPlayerScreen({ route, navigation }) {
   const { user } = useContext(AuthContext);

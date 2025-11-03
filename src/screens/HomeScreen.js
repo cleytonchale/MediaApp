@@ -13,8 +13,7 @@ import { AuthContext } from '../context/AuthContext';
 import { PlayerContext } from '../context/PlayerContext';
 import axios from 'axios';
 import { colors, typography, spacing } from '../theme';
-
-const API_BASE = 'http://10.168.62.170:8000';
+import API_BASE from '../config';
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }) {

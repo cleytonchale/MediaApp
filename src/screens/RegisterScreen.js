@@ -43,8 +43,8 @@ export default function RegisterScreen({ navigation }) {
     setLoading(true);
     try {
       await register(email, username, password);
-      alert('Conta criada com sucesso!');
-      navigation.navigate('Login');
+      console.log('Registro bem-sucedido!');
+      // Auto-navegação acontece via AppNavigator quando token é salvo
     } catch (e) {
       console.error('Erro ao registrar:', e);
       alert('Erro ao criar conta: ' + (e.response?.data?.detail || e.message));

@@ -13,8 +13,6 @@ import { colors, typography, spacing } from '../theme';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useContext(AuthContext);
-  const [uploadingMusic, setUploadingMusic] = useState(false);
-  const [uploadingVideo, setUploadingVideo] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -27,56 +25,19 @@ export default function ProfileScreen({ navigation }) {
     );
   };
 
-  const handleUploadMusic = () => {
-    Alert.alert(
-      'Upload de Música',
-      'Funcionalidade de upload em desenvolvimento.\n\nEm breve você poderá fazer upload de suas próprias músicas!',
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleUploadVideo = () => {
-    Alert.alert(
-      'Upload de Vídeo',
-      'Funcionalidade de upload em desenvolvimento.\n\nEm breve você poderá fazer upload de seus próprios vídeos!',
-      [{ text: 'OK' }]
-    );
-  };
-
   const menuItems = [
-    {
-      icon: 'musical-note',
-      title: 'Upload de Música',
-      subtitle: 'Adicione suas próprias músicas',
-      onPress: handleUploadMusic,
-      color: colors.primary.main,
-    },
-    {
-      icon: 'videocam',
-      title: 'Upload de Vídeo',
-      subtitle: 'Adicione seus próprios vídeos',
-      onPress: handleUploadVideo,
-      color: colors.secondary.main,
-    },
     {
       icon: 'settings',
       title: 'Configurações',
-      subtitle: 'Personalize seu aplicativo',
-      onPress: () => Alert.alert('Em desenvolvimento', 'Configurações estarão disponíveis em breve!'),
-      color: colors.text.secondary,
-    },
-    {
-      icon: 'help-circle',
-      title: 'Ajuda e Suporte',
-      subtitle: 'Tire suas dúvidas',
-      onPress: () => Alert.alert('Ajuda', 'Suporte técnico disponível em breve!'),
+      subtitle: 'Tema escuro/claro',
+      onPress: () => Alert.alert('Configurações', 'Tema escuro/claro estará disponível em breve!'),
       color: colors.text.secondary,
     },
     {
       icon: 'information-circle',
       title: 'Sobre',
       subtitle: 'Versão 1.0.0',
-      onPress: () => Alert.alert('Media Player', 'Versão 1.0.0\n\nAplicativo profissional de música e vídeo.'),
+      onPress: () => Alert.alert('Media Player', 'Versão 1.0.0\n\nAplicativo profissional de música e vídeo.\n\nDesenvolvido com React Native e FastAPI.'),
       color: colors.text.secondary,
     },
   ];
