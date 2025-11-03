@@ -10,10 +10,10 @@ class UserCreate(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    id: int  # Aceita int (usuário real) - guest terá 0
     email: str
     username: str
-    created_at: datetime
+    created_at: Optional[datetime] = None  # Guest não tem created_at
 
     class Config:
         from_attributes = True

@@ -91,7 +91,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         # Se for guest, retornar objeto fake
         if user_id == "guest":
             class GuestUser:
-                id = "guest"
+                id = 0
                 username = "Convidado"
                 email = "guest@guest.com"
             return GuestUser()
@@ -108,7 +108,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except ValueError:
         # Se não conseguir converter para int, é guest
         class GuestUser:
-            id = "guest"
+            id = 0
             username = "Convidado"
             email = "guest@guest.com"
         return GuestUser()
