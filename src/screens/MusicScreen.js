@@ -71,19 +71,31 @@ export default function MusicScreen({ navigation }) {
         copyToCacheDirectory: true,  // IMPORTANTE: true para uploads funcionarem
       });
 
-      if (result.type === 'cancel') {
+      if (result.canceled) {
         setUploading(false);
         return;
       }
 
-      console.log('[UPLOAD] Arquivo selecionado:', result.name, result.mimeType, 'URI:', result.uri);
+      console.log('[UPLOAD] Result completo:', JSON.stringify(result));
+      
+      // Validar resultado - expo-document-picker v14 retorna array
+      let file = null;
+      if (Array.isArray(result) && result.length > 0) {
+        file = result[0];
+      } else if (result && result.uri) {
+        file = result;
+      } else {
+        throw new Error('Arquivo inválido selecionado');
+      }
+      
+      console.log('[UPLOAD] Arquivo:', file.name, file.mimeType, 'URI:', file.uri);
 
       // Preparar FormData
       const formData = new FormData();
       formData.append('file', {
-        uri: result.uri,
-        type: result.mimeType,
-        name: result.name,
+        uri: file.uri,
+        type: file.mimeType,
+        name: file.name,
       });
       formData.append('titulo', uploadForm.titulo);
       formData.append('artista', uploadForm.artista);
@@ -93,13 +105,25 @@ export default function MusicScreen({ navigation }) {
       console.log('[UPLOAD] Enviando para:', `${API_BASE}/musicas/upload`);
       console.log('[UPLOAD] Token:', token ? token.substring(0, 20) + '...' : 'SEM TOKEN');
 
-      // Upload - NÃO definir Content-Type manualmente, axios faz isso automaticamente
-      await axios.post(`${API_BASE}/musicas/upload`, formData, {
+      // Upload usando fetch nativo (melhor para uploads grandes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
+      
+      const response = await fetch(`${API_BASE}/musicas/upload`, {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`,
         },
-        timeout: 300000, // 5 minutos para uploads grandes
+        body: formData,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Upload falhou: ${response.status}`);
+      }
       
       console.log('[UPLOAD] Sucesso!');
 
@@ -110,9 +134,8 @@ export default function MusicScreen({ navigation }) {
       
     } catch (error) {
       console.error('[UPLOAD] ERRO COMPLETO:', error);
-      console.error('[UPLOAD] Response:', error.response?.data);
-      console.error('[UPLOAD] Status:', error.response?.status);
-      Alert.alert('Erro', `Não foi possível enviar a música: ${error.message}`);
+      const errorMsg = error.message || 'Erro desconhecido';
+      Alert.alert('Erro', `Não foi possível enviar a música: ${errorMsg}`);
     } finally {
       setUploading(false);
     }
