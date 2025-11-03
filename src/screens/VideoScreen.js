@@ -35,10 +35,6 @@ export default function VideoScreen({ navigation }) {
     categoria: ''
   });
 
-  useEffect(() => {
-    loadVideos();
-  }, []);
-
   const loadVideos = async () => {
     setLoading(true);
     try {
@@ -53,6 +49,10 @@ export default function VideoScreen({ navigation }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadVideos();
+  }, []);
 
   const handleUpload = async () => {
     // Validar campos

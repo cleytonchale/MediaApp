@@ -36,10 +36,6 @@ export default function MusicScreen({ navigation }) {
     genero: ''
   });
 
-  useEffect(() => {
-    loadMusicas();
-  }, []);
-
   const loadMusicas = async () => {
     setLoading(true);
     try {
@@ -54,6 +50,10 @@ export default function MusicScreen({ navigation }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadMusicas();
+  }, []);
 
   const handleUpload = async () => {
     // Validar campos
