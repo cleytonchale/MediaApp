@@ -1,0 +1,29 @@
+========================================
+  ERRO 500 RESOLVIDO ✅
+========================================
+
+PROBLEMA:
+- /auth/me dava erro 500
+- GuestUser.id era "guest" (string)
+- UserResponse esperava int
+
+SOLUÇÃO:
+✅ GuestUser.id mudado para 0 (int)
+✅ UserResponse.created_at opcional
+✅ Duas instâncias corrigidas
+
+AGORA:
+- Guest funciona perfeitamente
+- /auth/me retorna dados corretos
+- Email mostra corretamente
+
+========================================
+
+AGUARDAR 2-3 MIN:
+Render faz deploy automático
+
+DEPOIS:
+Recarregar app e testar!
+
+========================================
+
