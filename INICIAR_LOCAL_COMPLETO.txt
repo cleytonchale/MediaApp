@@ -1,0 +1,59 @@
+========================================
+  COMO INICIAR APLICACAO LOCAL COMPLETA
+========================================
+
+PASSO A PASSO:
+
+TERMINAL 1 - BACKEND:
+
+1. Abrir PowerShell
+2. Ir para pasta backend:
+   cd C:\Users\HP\MediaApp\backend
+
+3. Ativar venv:
+   .\venv\Scripts\activate
+
+4. Iniciar servidor:
+   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+5. Deve aparecer:
+   INFO:     Uvicorn running on http://0.0.0.0:8000
+   INFO:     Application startup complete.
+
+---
+
+TERMINAL 2 - EXPO:
+
+1. Abrir PowerShell
+2. Ir para pasta MediaApp:
+   cd C:\Users\HP\MediaApp
+
+3. Iniciar Expo:
+   npx expo start -c
+
+4. Escanear QR code com Expo Go
+5. App conecta no backend local
+
+---
+
+TESTAR:
+
+1. Guest Login
+2. Upload Música (qualquer formato)
+3. Upload Vídeo (qualquer formato)
+4. Tocar música
+5. Ver vídeo
+
+TUDO DEVE FUNCIONAR! ✅
+
+---
+
+IMPORTANTE:
+
+- PC e telemóvel na MESMA rede Wi-Fi
+- Backend deve estar rodando antes
+- SQLite: dados persistem localmente
+- Uploads: salvos em backend/uploads/
+
+========================================
+

@@ -78,11 +78,21 @@ export default function MusicScreen({ navigation }) {
 
       console.log('[UPLOAD] Result completo:', JSON.stringify(result));
       
-      // Validar resultado - expo-document-picker v14 retorna array
+      // Validar resultado - expo-document-picker v14
       let file = null;
-      if (Array.isArray(result) && result.length > 0) {
-        file = result[0];
-      } else if (result && result.uri) {
+      
+      // Verificar se é cancelado
+      if (result.canceled || result.type === 'cancel') {
+        setUploading(false);
+        return;
+      }
+      
+      // Verificar formato de retorno
+      if (result.assets && result.assets.length > 0) {
+        // Novo formato v14 com assets array
+        file = result.assets[0];
+      } else if (result.uri) {
+        // Formato antigo
         file = result;
       } else {
         throw new Error('Arquivo inválido selecionado');
@@ -94,7 +104,7 @@ export default function MusicScreen({ navigation }) {
       const formData = new FormData();
       formData.append('file', {
         uri: file.uri,
-        type: file.mimeType,
+        type: file.mimeType || 'application/octet-stream',
         name: file.name,
       });
       formData.append('titulo', uploadForm.titulo);
