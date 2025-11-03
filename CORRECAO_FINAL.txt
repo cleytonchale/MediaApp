@@ -1,0 +1,25 @@
+========================================
+       CORRECAO APLICADA
+========================================
+
+PROBLEMA:
+- AbortController nao funciona no Expo Go
+- App crashava
+
+SOLUCAO:
+- Voltamos para axios (ja estava certo)
+- Removido AbortController
+
+AGORA:
+1. Expo esta a reiniciar com cache limpo
+2. Aguarda QR code aparecer
+3. Escaneia com Expo Go no telemovel
+4. App deve carregar sem erros
+
+TESTE:
+- Guest deve funcionar
+- Cadastro/Login deve funcionar
+- Uploads: testar (pode ter limitacao Render)
+
+========================================
+

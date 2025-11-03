@@ -105,25 +105,13 @@ export default function MusicScreen({ navigation }) {
       console.log('[UPLOAD] Enviando para:', `${API_BASE}/musicas/upload`);
       console.log('[UPLOAD] Token:', token ? token.substring(0, 20) + '...' : 'SEM TOKEN');
 
-      // Upload usando fetch nativo (melhor para uploads grandes)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
-      
-      const response = await fetch(`${API_BASE}/musicas/upload`, {
-        method: 'POST',
+      // Upload usando axios com timeout
+      await axios.post(`${API_BASE}/musicas/upload`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
-        body: formData,
-        signal: controller.signal,
+        timeout: 300000, // 5 minutos
       });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Upload falhou: ${response.status}`);
-      }
       
       console.log('[UPLOAD] Sucesso!');
 
@@ -134,7 +122,9 @@ export default function MusicScreen({ navigation }) {
       
     } catch (error) {
       console.error('[UPLOAD] ERRO COMPLETO:', error);
-      const errorMsg = error.message || 'Erro desconhecido';
+      console.error('[UPLOAD] Response:', error.response?.data);
+      console.error('[UPLOAD] Status:', error.response?.status);
+      const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
       Alert.alert('Erro', `Não foi possível enviar a música: ${errorMsg}`);
     } finally {
       setUploading(false);
