@@ -66,7 +66,7 @@ export default function VideoScreen({ navigation }) {
     try {
       console.log('[UPLOAD] Iniciando seleção de arquivo...');
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
+        type: '*/*', // Aceitar qualquer arquivo de vídeo
         copyToCacheDirectory: true,  // IMPORTANTE: true para uploads funcionarem
       });
 

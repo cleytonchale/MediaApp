@@ -1,0 +1,32 @@
+========================================
+  COMO INICIAR BACKEND LOCAL
+========================================
+
+TERMINAL 1 (Backend):
+
+1. Abrir PowerShell em backend/
+2. Executar:
+   .\venv\Scripts\activate
+   pip install -r requirements.txt
+   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+3. Deve aparecer: "Uvicorn running on http://0.0.0.0:8000"
+
+TERMINAL 2 (Expo):
+
+1. Abrir PowerShell na pasta MediaApp (raiz)
+2. Executar:
+   npx expo start
+
+3. Escanear QR com Expo Go
+4. App conecta no backend local
+
+========================================
+
+RESULTADO:
+- ✅ 502 Bad Gateway resolvido
+- ✅ Uploads funcionam
+- ✅ Tudo local e rápido
+
+========================================
+

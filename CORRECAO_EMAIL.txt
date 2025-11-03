@@ -1,0 +1,29 @@
+========================================
+    CORRECAO APLICADA
+========================================
+
+PROBLEMA:
+- Ao cadastrar/login, mostrava "guest@app.com"
+- Email do usuario nao aparecia
+
+SOLUCAO:
+- AuthContext agora busca dados via /auth/me
+- Endpoint retorna: id, username, email
+- Dados vem do PostgreSQL
+
+COMO FUNCIONA:
+1. Login -> recebe token
+2. Token -> chama /auth/me
+3. /auth/me -> retorna usuario completo
+4. Frontend -> mostra email correto
+
+TESTE AGORA:
+1. Recarregar app (pressiona 'r' no Expo)
+2. Fazer novo cadastro
+3. Verificar email no Perfil
+4. Deve mostrar email cadastrado!
+
+AGUARDAR 2-3 MIN para Render deploy
+
+========================================
+

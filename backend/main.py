@@ -224,15 +224,10 @@ async def upload_musica(
     import sys
     sys.stdout.flush()  # Forçar flush para aparecer nos logs
     
-    # Validar extensão
-    allowed_extensions = {'.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg'}
+    # Validar extensão - aceitar qualquer áudio
+    # Remove validação de extensão para aceitar qualquer formato
+    # allowed_extensions = {'.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg', '.opus', '.wma', '.amr', '.3gp'}
     file_ext = Path(file.filename).suffix.lower()
-    
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Formato não suportado. Use: {', '.join(allowed_extensions)}"
-        )
     
     # Gerar nome único
     timestamp = int(datetime.utcnow().timestamp())
@@ -349,15 +344,10 @@ async def upload_video(
     import sys
     sys.stdout.flush()  # Forçar flush para aparecer nos logs
     
-    # Validar extensão
-    allowed_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm'}
+    # Validar extensão - aceitar qualquer vídeo
+    # Remove validação de extensão para aceitar qualquer formato
+    # allowed_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.3gp'}
     file_ext = Path(file.filename).suffix.lower()
-    
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Formato não suportado. Use: {', '.join(allowed_extensions)}"
-        )
     
     # Gerar nome único
     timestamp = int(datetime.utcnow().timestamp())

@@ -1,0 +1,43 @@
+========================================
+  ESCOLHA A CONFIGURAÇÃO DA API
+========================================
+
+OPÇÃO 1: BACKEND LOCAL (Para testes)
+Vantagens:
+- Totalmente funcional
+- Uploads persistem
+- Gratuito
+- Sem limitações
+
+Desvantagens:
+- PC deve estar ligado
+- Mesma rede Wi-Fi
+- IP: 10.168.62.170
+
+Config:
+const API_BASE = 'http://10.168.62.170:8000';
+
+----------------------------------------
+
+OPÇÃO 2: RENDER (Atual)
+Vantagens:
+- Funciona online
+- Não precisa PC
+
+Desvantagens:
+- Dorme após 15min
+- Uploads se perdem
+- 502 Bad Gateway
+
+Config:
+const API_BASE = 'https://mediaapp-backend-9zw7.onrender.com';
+
+========================================
+
+RECOMENDAÇÃO:
+Para testar uploads: Use OPÇÃO 1 (Local)
+
+Qual prefere? Diga 1 ou 2
+
+========================================
+

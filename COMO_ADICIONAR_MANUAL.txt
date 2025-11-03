@@ -1,0 +1,34 @@
+========================================
+  COMO ADICIONAR MÚSICA/VÍDEO MANUAL
+========================================
+
+PASSO A PASSO:
+
+1. COLOCAR ARQUIVO NA PASTA:
+   - Copia MP3 para: backend/uploads/musicas/
+   - Copia MP4 para: backend/uploads/videos/
+
+2. ABRIR TERMINAL:
+   cd backend
+
+3. ATIVAR VENV:
+   .\venv\Scripts\activate
+
+4. EXECUTAR SCRIPT:
+   python adicionar_manual.py
+
+5. ESCOLHER OPÇÃO:
+   - Opção 1: Adicionar Música
+   - Opção 2: Adicionar Vídeo
+   - Opção 3: Ver lista
+
+6. PREENCHER DADOS:
+   - Escolher número do arquivo
+   - Inserir título, artista, etc.
+
+RESULTADO:
+- Arquivo adicionado ao banco
+- Aparece na app!
+
+========================================
+

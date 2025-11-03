@@ -67,7 +67,7 @@ export default function MusicScreen({ navigation }) {
     try {
       console.log('[UPLOAD] Iniciando seleção de arquivo...');
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['audio/mpeg', 'audio/wav', 'audio/flac', 'audio/x-ms-wma'],
+        type: '*/*', // Aceitar qualquer arquivo de áudio
         copyToCacheDirectory: true,  // IMPORTANTE: true para uploads funcionarem
       });
 
