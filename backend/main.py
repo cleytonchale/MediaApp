@@ -73,34 +73,44 @@ async def serve_file(file_path: str):
     print(f"[SERVE FILE] Contém espaços? {' ' in normalized_path}")
     sys.stdout.flush()
     
+    # IMPORTANTE: FastAPI JÁ DECODIFICA a URL antes de chegar aqui!
+    # Se a URL tem %20, o FastAPI converte para ESPAÇO automaticamente
+    # Mas o arquivo no disco pode ter %20 LITERAL no nome!
+    
     # Lista de caminhos para tentar (em ordem de prioridade)
     paths_to_try = []
     
-    # 1. Caminho como recebido (FastAPI pode ter decodificado %20 para espaço)
+    # 1. PRIMEIRA TENTATIVA: Se tem espaços, substituir TODOS por %20 literal
+    # (arquivo antigo pode ter sido salvo com %20 literal no nome)
+    if ' ' in normalized_path:
+        path_with_percent20 = normalized_path.replace(' ', '%20')
+        paths_to_try.append(path_with_percent20)
+        print(f"[SERVE FILE] PRIORIDADE 1: Tentando com %20 literal: {repr(path_with_percent20)}")
+    
+    # 2. Segunda tentativa: Caminho como recebido (pode funcionar se arquivo novo)
     paths_to_try.append(normalized_path)
     
-    # 2. Se tem espaços, tentar com %20 (arquivo pode ter %20 literal no nome)
-    if ' ' in normalized_path:
-        path_with_percent = normalized_path.replace(' ', '%20')
-        paths_to_try.append(path_with_percent)
-        print(f"[SERVE FILE] Espaços detectados - tentando com %20: {repr(path_with_percent)}")
-    
-    # 3. Se tem espaços, tentar com underscore (arquivo pode ter sido salvo com underscore)
+    # 3. Se tem espaços, tentar com underscore (arquivo novo pode ter sido salvo assim)
     if ' ' in normalized_path:
         path_with_underscore = normalized_path.replace(' ', '_')
         paths_to_try.append(path_with_underscore)
     
-    # 4. Se tem %20, decodificar para espaço e depois tentar variações
+    # 4. Se ainda tem %20 na string (não foi decodificado), tentar decodificar
     if '%20' in normalized_path:
         decoded = urllib.parse.unquote(normalized_path)
         if decoded != normalized_path:
             paths_to_try.append(decoded)
-            # Tentar com underscore também
+            # E tentar com underscore também
             paths_to_try.append(decoded.replace(' ', '_'))
     
-    # 5. Tentar decodificar completamente e depois aplicar underscores
+    # 5. Decodificar completamente e tentar variações
     fully_decoded = urllib.parse.unquote(normalized_path)
     if fully_decoded != normalized_path:
+        # Tentar com %20
+        path_fully_decoded_percent = fully_decoded.replace(' ', '%20')
+        if path_fully_decoded_percent not in paths_to_try:
+            paths_to_try.append(path_fully_decoded_percent)
+        # Tentar com underscore
         path_fully_decoded_underscore = fully_decoded.replace(' ', '_').replace('(', '_').replace(')', '_')
         if path_fully_decoded_underscore not in paths_to_try:
             paths_to_try.append(path_fully_decoded_underscore)
@@ -109,6 +119,28 @@ async def serve_file(file_path: str):
     path_underscore_all = normalized_path.replace(' ', '_').replace('%20', '_').replace('%28', '_').replace('%29', '_').replace('(', '_').replace(')', '_')
     if path_underscore_all != normalized_path and path_underscore_all not in paths_to_try:
         paths_to_try.append(path_underscore_all)
+    
+    # 7. ÚLTIMA TENTATIVA: Buscar arquivo por timestamp (busca inteligente)
+    # Extrair apenas o nome do arquivo (sem timestamp)
+    if '/' in normalized_path:
+        filename_part = normalized_path.split('/')[-1]
+        dir_name = normalized_path.split('/')[0]
+        music_dir = UPLOAD_DIR / dir_name if dir_name else UPLOAD_DIR
+        
+        # Tentar encontrar arquivo que começa com o timestamp
+        if music_dir.exists():
+            import re
+            # Extrair timestamp se existir
+            match = re.match(r'^(\d+)_(.+)$', filename_part)
+            if match:
+                timestamp = match.group(1)
+                # Buscar arquivos que começam com o timestamp
+                for existing_file in music_dir.iterdir():
+                    if existing_file.name.startswith(timestamp + '_'):
+                        found_path = f"{dir_name}/{existing_file.name}"
+                        if found_path not in paths_to_try:
+                            paths_to_try.append(found_path)
+                            print(f"[SERVE FILE] Arquivo encontrado por timestamp: {existing_file.name}")
     
     # Remover duplicatas mantendo ordem
     seen = set()
