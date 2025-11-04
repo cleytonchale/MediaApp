@@ -76,21 +76,39 @@ async def serve_file(file_path: str):
     # Lista de caminhos para tentar (em ordem de prioridade)
     paths_to_try = []
     
-    # 1. Se tem espaços, substituir por %20 (arquivo tem %20 literal no nome)
-    # Esta é a tentativa mais provável, pois FastAPI decodifica %20 para espaço
+    # 1. Caminho como recebido (FastAPI pode ter decodificado %20 para espaço)
+    paths_to_try.append(normalized_path)
+    
+    # 2. Se tem espaços, tentar com %20 (arquivo pode ter %20 literal no nome)
     if ' ' in normalized_path:
         path_with_percent = normalized_path.replace(' ', '%20')
         paths_to_try.append(path_with_percent)
         print(f"[SERVE FILE] Espaços detectados - tentando com %20: {repr(path_with_percent)}")
     
-    # 2. Caminho como recebido (pode já ter %20 se FastAPI não decodificou)
-    paths_to_try.append(normalized_path)
+    # 3. Se tem espaços, tentar com underscore (arquivo pode ter sido salvo com underscore)
+    if ' ' in normalized_path:
+        path_with_underscore = normalized_path.replace(' ', '_')
+        paths_to_try.append(path_with_underscore)
     
-    # 3. Se tem %20, decodificar para espaço (caso contrário)
+    # 4. Se tem %20, decodificar para espaço e depois tentar variações
     if '%20' in normalized_path:
         decoded = urllib.parse.unquote(normalized_path)
         if decoded != normalized_path:
             paths_to_try.append(decoded)
+            # Tentar com underscore também
+            paths_to_try.append(decoded.replace(' ', '_'))
+    
+    # 5. Tentar decodificar completamente e depois aplicar underscores
+    fully_decoded = urllib.parse.unquote(normalized_path)
+    if fully_decoded != normalized_path:
+        path_fully_decoded_underscore = fully_decoded.replace(' ', '_').replace('(', '_').replace(')', '_')
+        if path_fully_decoded_underscore not in paths_to_try:
+            paths_to_try.append(path_fully_decoded_underscore)
+    
+    # 6. Tentar com todos os caracteres especiais substituídos por underscore
+    path_underscore_all = normalized_path.replace(' ', '_').replace('%20', '_').replace('%28', '_').replace('%29', '_').replace('(', '_').replace(')', '_')
+    if path_underscore_all != normalized_path and path_underscore_all not in paths_to_try:
+        paths_to_try.append(path_underscore_all)
     
     # Remover duplicatas mantendo ordem
     seen = set()
@@ -370,8 +388,12 @@ async def upload_musica(
     # Remover caracteres problemáticos e codificações URL do nome
     import urllib.parse
     decoded_filename = urllib.parse.unquote(file.filename)  # Decodificar se já estiver encoded
-    # Sanitizar: remover caracteres especiais, manter apenas alfanuméricos, espaços, hífens, underscores e pontos
-    safe_name = ''.join(c if c.isalnum() or c in (' ', '-', '_', '.') else '_' for c in decoded_filename)
+    # Sanitizar: substituir espaços por underscores para evitar problemas com %20
+    # Remover caracteres especiais, manter apenas alfanuméricos, hífens, underscores e pontos
+    safe_name = decoded_filename.replace(' ', '_').replace('%20', '_')
+    # Substituir parênteses e outros caracteres especiais por underscore
+    safe_name = safe_name.replace('(', '_').replace(')', '_').replace('%28', '_').replace('%29', '_')
+    safe_name = ''.join(c if c.isalnum() or c in ('-', '_', '.') else '_' for c in safe_name)
     safe_filename = f"{timestamp}_{safe_name}"
     file_path = MUSICA_DIR / safe_filename
     
@@ -541,8 +563,12 @@ async def upload_video(
     # Remover caracteres problemáticos e codificações URL do nome
     import urllib.parse
     decoded_filename = urllib.parse.unquote(file.filename)  # Decodificar se já estiver encoded
-    # Sanitizar: remover caracteres especiais, manter apenas alfanuméricos, espaços, hífens, underscores e pontos
-    safe_name = ''.join(c if c.isalnum() or c in (' ', '-', '_', '.') else '_' for c in decoded_filename)
+    # Sanitizar: substituir espaços por underscores para evitar problemas com %20
+    # Remover caracteres especiais, manter apenas alfanuméricos, hífens, underscores e pontos
+    safe_name = decoded_filename.replace(' ', '_').replace('%20', '_')
+    # Substituir parênteses e outros caracteres especiais por underscore
+    safe_name = safe_name.replace('(', '_').replace(')', '_').replace('%28', '_').replace('%29', '_')
+    safe_name = ''.join(c if c.isalnum() or c in ('-', '_', '.') else '_' for c in safe_name)
     safe_filename = f"{timestamp}_{safe_name}"
     file_path = VIDEO_DIR / safe_filename
     
