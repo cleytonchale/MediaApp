@@ -54,9 +54,15 @@ export default function MusicPlayerScreen({ route, navigation }) {
   }, [isPlaying, sound]);
 
   const setupAudio = async () => {
-    if (!currentTrack || !currentTrack.fileUrl) return;
+    if (!currentTrack || !currentTrack.fileUrl) {
+      console.error('[MUSIC PLAYER] Track ou fileUrl não disponível');
+      return;
+    }
 
+    console.log('[MUSIC PLAYER] ========================================');
     console.log('[MUSIC PLAYER] Carregando áudio:', currentTrack.fileUrl);
+    console.log('[MUSIC PLAYER] Track:', currentTrack.title);
+    console.log('[MUSIC PLAYER] ========================================');
 
     setLoading(true);
     try {
@@ -70,6 +76,20 @@ export default function MusicPlayerScreen({ route, navigation }) {
       // Descarregar som anterior se existir
       if (sound) {
         await sound.unloadAsync();
+        setSound(null);
+      }
+
+      // Verificar se a URL está acessível antes de tentar carregar
+      try {
+        const response = await fetch(currentTrack.fileUrl, { method: 'HEAD' });
+        if (!response.ok) {
+          console.error('[MUSIC PLAYER] Arquivo não encontrado no servidor:', response.status);
+          throw new Error(`Arquivo não encontrado (${response.status})`);
+        }
+        console.log('[MUSIC PLAYER] ✓ Arquivo verificado no servidor');
+      } catch (fetchError) {
+        console.warn('[MUSIC PLAYER] Aviso ao verificar arquivo (continuando):', fetchError.message);
+        // Continuar mesmo se a verificação falhar (alguns servidores não suportam HEAD)
       }
 
       // Carregar e preparar o áudio
@@ -81,14 +101,49 @@ export default function MusicPlayerScreen({ route, navigation }) {
       setSound(newSound);
 
       // Escutar mudanças de estado
-      newSound.setOnPlaybackStatusUpdate(setPlaybackStatus);
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        setPlaybackStatus(status);
+        if (status.didJustFinish && !status.isLooping) {
+          playNext();
+        }
+      });
 
-      console.log('[MUSIC PLAYER] ✓ Áudio carregado com sucesso');
+      console.log('[MUSIC PLAYER] ✓✓✓ ÁUDIO CARREGADO COM SUCESSO! ✓✓✓');
 
     } catch (error) {
-      console.error('[MUSIC PLAYER] Erro ao carregar áudio:', error);
+      console.error('[MUSIC PLAYER] ========================================');
+      console.error('[MUSIC PLAYER] ERRO AO CARREGAR ÁUDIO');
+      console.error('[MUSIC PLAYER] Erro:', error);
+      console.error('[MUSIC PLAYER] Mensagem:', error.message);
       console.error('[MUSIC PLAYER] URL tentada:', currentTrack.fileUrl);
-      Alert.alert('Erro', `Não foi possível carregar a música.\n\nURL: ${currentTrack.fileUrl}\n\nVerifique se o arquivo existe no servidor.`);
+      console.error('[MUSIC PLAYER] ========================================');
+      
+      let errorMessage = 'Não foi possível carregar a música.';
+      
+      if (error.message?.includes('404') || error.message?.includes('not found')) {
+        errorMessage += '\n\nO arquivo não foi encontrado no servidor.';
+        errorMessage += '\n\nIsso pode acontecer se:';
+        errorMessage += '\n• O arquivo foi deletado';
+        errorMessage += '\n• O servidor está offline';
+        errorMessage += '\n• Há um problema com o nome do arquivo';
+      } else if (error.message?.includes('network') || error.message?.includes('Network')) {
+        errorMessage += '\n\nErro de conexão.';
+        errorMessage += '\n\nVerifique sua conexão com a internet.';
+      } else {
+        errorMessage += `\n\nErro: ${error.message || 'Erro desconhecido'}`;
+      }
+      
+      errorMessage += `\n\nURL: ${currentTrack.fileUrl}`;
+      
+      Alert.alert('Erro ao Reproduzir', errorMessage, [
+        { text: 'OK', style: 'default' },
+        { 
+          text: 'Tentar Novamente', 
+          onPress: () => {
+            setTimeout(() => setupAudio(), 1000);
+          }
+        }
+      ]);
     } finally {
       setLoading(false);
     }
