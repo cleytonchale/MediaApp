@@ -56,6 +56,8 @@ export default function MusicPlayerScreen({ route, navigation }) {
   const setupAudio = async () => {
     if (!currentTrack || !currentTrack.fileUrl) return;
 
+    console.log('[MUSIC PLAYER] Carregando áudio:', currentTrack.fileUrl);
+
     setLoading(true);
     try {
       // Solicitar permissão para tocar áudio
@@ -81,9 +83,12 @@ export default function MusicPlayerScreen({ route, navigation }) {
       // Escutar mudanças de estado
       newSound.setOnPlaybackStatusUpdate(setPlaybackStatus);
 
+      console.log('[MUSIC PLAYER] ✓ Áudio carregado com sucesso');
+
     } catch (error) {
-      console.error('Erro ao carregar áudio:', error);
-      Alert.alert('Erro', 'Não foi possível carregar a música');
+      console.error('[MUSIC PLAYER] Erro ao carregar áudio:', error);
+      console.error('[MUSIC PLAYER] URL tentada:', currentTrack.fileUrl);
+      Alert.alert('Erro', `Não foi possível carregar a música.\n\nURL: ${currentTrack.fileUrl}\n\nVerifique se o arquivo existe no servidor.`);
     } finally {
       setLoading(false);
     }

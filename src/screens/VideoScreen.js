@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { AuthContext } from '../context/AuthContext';
 import { PlayerContext } from '../context/PlayerContext';
 import axios from 'axios';
@@ -66,16 +67,17 @@ export default function VideoScreen({ navigation }) {
     try {
       console.log('[UPLOAD] Iniciando seleção de arquivo...');
       
-      // Usar DocumentPicker - mais simples e confiável
+      // Usar DocumentPicker
       const pickerResult = await DocumentPicker.getDocumentAsync({
         type: ['video/*', '*/*'],
-        copyToCacheDirectory: true,
+        multiple: false,
       });
 
       console.log('[UPLOAD] Picker result:', JSON.stringify(pickerResult));
       
       // Verificar se cancelou
       if (pickerResult.canceled) {
+        console.log('[UPLOAD] Seleção cancelada pelo usuário');
         setUploading(false);
         return;
       }
@@ -88,34 +90,155 @@ export default function VideoScreen({ navigation }) {
       } else if (pickerResult.uri) {
         file = pickerResult;
       } else {
-        throw new Error('Arquivo inválido selecionado');
+        throw new Error('Arquivo inválido selecionado - nenhum arquivo encontrado no resultado');
       }
       
-      console.log('[UPLOAD] Arquivo selecionado:', file.name, file.mimeType, 'URI:', file.uri);
+      // Validar que o arquivo tem as propriedades necessárias
+      if (!file || !file.uri) {
+        throw new Error('Arquivo inválido selecionado - URI não encontrada');
+      }
 
-      // Preparar FormData
-      const formData = new FormData();
-      formData.append('file', {
-        uri: file.uri,
-        type: file.mimeType || 'application/octet-stream',
+      console.log('[UPLOAD] Arquivo selecionado:', {
         name: file.name,
+        mimeType: file.mimeType,
+        uri: file.uri,
+        size: file.size,
       });
-      formData.append('titulo', uploadForm.titulo);
-      formData.append('descricao', uploadForm.descricao);
-      formData.append('categoria', uploadForm.categoria);
+
+      // Garantir que o nome do arquivo está correto
+      const fileName = file.name || 'video.mp4';
+      
+      // Determinar MIME type correto
+      let mimeType = file.mimeType || 'video/mp4';
+      
+      // Se não tiver mimeType, tentar detectar pela extensão
+      if (!file.mimeType && fileName) {
+        const ext = fileName.toLowerCase().split('.').pop();
+        const mimeTypes = {
+          'mp4': 'video/mp4',
+          'avi': 'video/x-msvideo',
+          'mov': 'video/quicktime',
+          'mkv': 'video/x-matroska',
+          'webm': 'video/webm',
+          '3gp': 'video/3gpp',
+          'm4v': 'video/x-m4v',
+        };
+        if (mimeTypes[ext]) {
+          mimeType = mimeTypes[ext];
+        }
+      }
+
+      // CRÍTICO: No Android, URIs content:// não funcionam diretamente
+      // Precisamos copiar para o cache do FileSystem que retorna file://
+      let fileUri = file.uri;
+      console.log('[UPLOAD] URI original:', fileUri);
+      
+      // Sempre copiar para cache no Android para garantir acesso
+      if (Platform.OS === 'android') {
+        console.log('[UPLOAD] Android detectado, copiando arquivo para cache...');
+        try {
+          const timestamp = Date.now();
+          const cacheFileName = `${timestamp}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+          const cacheUri = `${FileSystem.cacheDirectory}${cacheFileName}`;
+          
+          console.log('[UPLOAD] Copiando de:', fileUri);
+          console.log('[UPLOAD] Para:', cacheUri);
+          
+          await FileSystem.copyAsync({
+            from: fileUri,
+            to: cacheUri,
+          });
+          
+          fileUri = cacheUri;
+          console.log('[UPLOAD] ✓ Arquivo copiado com sucesso para cache');
+          
+          // Verificar se o arquivo foi copiado corretamente
+          const fileInfo = await FileSystem.getInfoAsync(fileUri);
+          if (!fileInfo.exists) {
+            throw new Error('Arquivo não foi copiado corretamente para cache');
+          }
+          console.log('[UPLOAD] Arquivo verificado. Tamanho:', fileInfo.size, 'bytes');
+        } catch (copyError) {
+          console.error('[UPLOAD] Erro ao copiar arquivo:', copyError);
+          throw new Error(`Não foi possível acessar o arquivo: ${copyError.message}`);
+        }
+      }
+
+      // Preparar FormData - formato correto para React Native
+      const formData = new FormData();
+      
+      // No React Native, o FormData precisa de um objeto com uri, type e name
+      // IMPORTANTE: Não usar JSON.stringify ou qualquer outra transformação
+      const fileData = {
+        uri: fileUri,
+        type: mimeType,
+        name: fileName,
+      };
+      formData.append('file', fileData);
+      
+      formData.append('titulo', uploadForm.titulo.trim());
+      if (uploadForm.descricao && uploadForm.descricao.trim()) {
+        formData.append('descricao', uploadForm.descricao.trim());
+      }
+      if (uploadForm.categoria && uploadForm.categoria.trim()) {
+        formData.append('categoria', uploadForm.categoria.trim());
+      }
+      
+      console.log('[UPLOAD] FormData preparado com:');
+      console.log('[UPLOAD] - Arquivo:', fileName, `(${mimeType})`);
+      console.log('[UPLOAD] - URI:', fileUri.substring(0, 80) + '...');
+      console.log('[UPLOAD] - Título:', uploadForm.titulo);
 
       console.log('[UPLOAD] Enviando para:', `${API_BASE}/videos/upload`);
       console.log('[UPLOAD] Token:', token ? token.substring(0, 20) + '...' : 'SEM TOKEN');
+      console.log('[UPLOAD] Platform:', Platform.OS);
+             console.log('[UPLOAD] File URI final:', fileUri);
+       console.log('[UPLOAD] File name:', fileName);
+       console.log('[UPLOAD] File type:', mimeType);
 
-      // Upload usando axios com timeout
-      await axios.post(`${API_BASE}/videos/upload`, formData, {
+      // Teste de conectividade antes do upload (apenas verificar se backend responde)
+      try {
+        console.log('[UPLOAD] Testando conectividade com o backend...');
+        await axios.get(`${API_BASE}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000,
+        });
+        console.log('[UPLOAD] ✓ Backend acessível');
+      } catch (connectError) {
+        console.warn('[UPLOAD] ⚠ Aviso: Não foi possível conectar ao backend, mas tentando upload mesmo assim...');
+        // Continuar mesmo assim, pode ser que o endpoint de upload funcione
+      }
+
+      // Validar token antes do upload
+      if (!token) {
+        throw new Error('Você precisa estar autenticado para fazer upload. Faça login novamente.');
+      }
+
+      // Upload usando fetch nativo (melhor para arquivos grandes no Android)
+      console.log('[UPLOAD] Iniciando upload para:', `${API_BASE}/videos/upload`);
+      console.log('[UPLOAD] Tamanho do arquivo:', file.size, 'bytes (', (file.size / 1024 / 1024).toFixed(2), 'MB)');
+      
+      // Usar fetch nativo - funciona melhor para arquivos grandes no React Native
+      const uploadResponse = await fetch(`${API_BASE}/videos/upload`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          // NÃO definir Content-Type - fetch define automaticamente para FormData
         },
-        timeout: 300000, // 5 minutos
+        body: formData,
       });
+
+      console.log('[UPLOAD] Status da resposta:', uploadResponse.status);
       
-      console.log('[UPLOAD] Sucesso!');
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('[UPLOAD] Erro do servidor:', errorText);
+        throw new Error(`Erro ${uploadResponse.status}: ${errorText}`);
+      }
+
+      const responseData = await uploadResponse.json();
+      console.log('[UPLOAD] ✓ Upload bem-sucedido!', responseData);
 
       Alert.alert('Sucesso!', 'Vídeo enviado com sucesso');
       setShowUploadModal(false);
@@ -123,11 +246,47 @@ export default function VideoScreen({ navigation }) {
       loadVideos();
       
     } catch (error) {
-      console.error('[UPLOAD] ERRO COMPLETO:', error);
-      console.error('[UPLOAD] Response:', error.response?.data);
-      console.error('[UPLOAD] Status:', error.response?.status);
-      const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
-      Alert.alert('Erro', `Não foi possível enviar o vídeo: ${errorMsg}`);
+      console.error('[UPLOAD] ========== ERRO DETALHADO ==========');
+      console.error('[UPLOAD] Erro completo:', error);
+      console.error('[UPLOAD] Código:', error.code);
+             console.error('[UPLOAD] Mensagem:', error.message);
+       console.error('[UPLOAD] Stack:', error.stack);
+       console.error('[UPLOAD] Response data:', error.response?.data);
+       console.error('[UPLOAD] Response status:', error.response?.status);
+       
+       // Verificar se o erro está relacionado ao arquivo
+       if (error.message?.includes('file') || error.message?.includes('File') || error.message?.includes('URI')) {
+         console.error('[UPLOAD] Erro relacionado ao arquivo detectado');
+       }
+      console.error('[UPLOAD] API_BASE:', API_BASE);
+      console.error('[UPLOAD] URL completa:', `${API_BASE}/videos/upload`);
+      console.error('[UPLOAD] Platform:', Platform.OS);
+      console.error('[UPLOAD] ======================================');
+      
+      let errorMsg = 'Erro desconhecido';
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMsg = 'Timeout - O upload demorou muito. Tente novamente.';
+      } else if (error.code === 'NETWORK_ERROR' || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error') || error.message?.includes('Network request failed')) {
+        errorMsg = `Erro de conexão (Network Error).\n\nSOLUÇÕES:\n\n1. Verifique se o backend está rodando:\n   cd backend && python main.py\n\n2. Confirme o IP correto em src/config.js\n   IP atual: ${API_BASE}\n\n3. Se usando API local:\n   • Celular e PC devem estar na MESMA rede Wi-Fi\n   • Verifique firewall do Windows (rode LIBERAR_FIREWALL.bat)\n   • Teste o IP no navegador: ${API_BASE}/docs\n\n4. Se o erro persistir, tente:\n   • Reiniciar o backend\n   • Reiniciar o app\n   • Verificar se o IP do PC mudou`;
+      } else if (!error.response && error.request) {
+        errorMsg = `Sem resposta do servidor.\n\nA API pode estar offline ou inacessível.\n\nURL tentada: ${API_BASE}/videos/upload\n\nVerifique:\n• Backend está rodando?\n• Firewall bloqueando porta 8000?\n• Mesma rede Wi-Fi?`;
+      } else if (error.response?.status === 401) {
+        errorMsg = 'Não autorizado - Token expirado ou inválido.\n\nPor favor:\n• Faça logout\n• Faça login novamente\n• Tente fazer o upload novamente';
+      } else if (error.response?.status === 413) {
+        errorMsg = 'Arquivo muito grande. Tente um arquivo menor.';
+      } else if (error.response?.status === 400) {
+        const detail = error.response.data?.detail || 'Dados inválidos';
+        errorMsg = `Erro de validação: ${detail}\n\nVerifique:\n• Título está preenchido?\n• Arquivo foi selecionado corretamente?\n• Arquivo não está corrompido?`;
+       } else if (error.response?.status === 422) {
+         errorMsg = 'Arquivo inválido ou corrompido. Tente selecionar outro arquivo.';
+       } else if (error.response) {
+        errorMsg = error.response.data?.detail || `Erro ${error.response.status}: ${error.response.statusText}`;
+      } else {
+        errorMsg = error.message || 'Erro desconhecido ao fazer upload';
+      }
+      
+      Alert.alert('Erro no Upload', errorMsg);
     } finally {
       setUploading(false);
     }
@@ -158,12 +317,21 @@ export default function VideoScreen({ navigation }) {
   };
 
   const playVideo = (video) => {
+    // Normalizar caminho - NÃO fazer encoding se já contém % (arquivo pode ter %20 literal)
+    const normalizedPath = video.arquivo_path.replace(/\\/g, '/');
+    
+    // Se o caminho já contém % (como %20), usar diretamente sem encoding adicional
+    // Isso evita double-encoding que causaria 404
+    const fileUrl = normalizedPath.includes('%') 
+      ? `${API_BASE}/uploads/${normalizedPath}`
+      : `${API_BASE}/uploads/${normalizedPath.split('/').map(segment => encodeURIComponent(segment)).join('/')}`;
+    
     const track = {
       videoId: video.id.toString(),
       title: video.titulo,
       channel: video.descricao || 'Sem descrição',
       thumbnail: null,
-      fileUrl: `${API_BASE}/uploads/${video.arquivo_path}`
+      fileUrl: fileUrl
     };
     playNow(track);
     navigation.navigate('VideoPlayer', { 

@@ -47,8 +47,120 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Servir arquivos estáticos
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Rota customizada para servir arquivos (resolve problemas com caracteres especiais)
+from fastapi.responses import FileResponse
+from urllib.parse import unquote
+
+@app.get("/uploads/{file_path:path}")
+async def serve_file(file_path: str):
+    """
+    Serve arquivos estáticos com suporte a caracteres especiais e URLs encoded.
+    Tenta múltiplas variações do caminho para encontrar o arquivo.
+    """
+    import urllib.parse
+    import sys
+    
+    # IMPORTANTE: FastAPI DECODIFICA automaticamente os parâmetros de path!
+    # Então se a URL tem %20, o FastAPI já decodifica para ESPAÇO antes de passar aqui
+    # Mas o arquivo no disco tem %20 LITERAL no nome!
+    
+    # Normalizar barras
+    normalized_path = file_path.replace('\\', '/')
+    print(f"\n[SERVE FILE] =========================================")
+    print(f"[SERVE FILE] Recebida requisição para: {repr(file_path)}")
+    print(f"[SERVE FILE] Caminho normalizado: {repr(normalized_path)}")
+    print(f"[SERVE FILE] Contém %20? {'%20' in normalized_path}")
+    print(f"[SERVE FILE] Contém espaços? {' ' in normalized_path}")
+    sys.stdout.flush()
+    
+    # Lista de caminhos para tentar (em ordem de prioridade)
+    paths_to_try = []
+    
+    # 1. Se tem espaços, substituir por %20 (arquivo tem %20 literal no nome)
+    # Esta é a tentativa mais provável, pois FastAPI decodifica %20 para espaço
+    if ' ' in normalized_path:
+        path_with_percent = normalized_path.replace(' ', '%20')
+        paths_to_try.append(path_with_percent)
+        print(f"[SERVE FILE] Espaços detectados - tentando com %20: {repr(path_with_percent)}")
+    
+    # 2. Caminho como recebido (pode já ter %20 se FastAPI não decodificou)
+    paths_to_try.append(normalized_path)
+    
+    # 3. Se tem %20, decodificar para espaço (caso contrário)
+    if '%20' in normalized_path:
+        decoded = urllib.parse.unquote(normalized_path)
+        if decoded != normalized_path:
+            paths_to_try.append(decoded)
+    
+    # Remover duplicatas mantendo ordem
+    seen = set()
+    unique_paths = []
+    for p in paths_to_try:
+        if p not in seen:
+            seen.add(p)
+            unique_paths.append(p)
+    paths_to_try = unique_paths
+    
+    print(f"[SERVE FILE] Caminhos para tentar ({len(paths_to_try)}):")
+    for i, p in enumerate(paths_to_try, 1):
+        print(f"  {i}. {repr(p)}")
+    sys.stdout.flush()
+    
+    # Tentar cada caminho
+    full_path = None
+    for attempt_path in paths_to_try:
+        test_path = UPLOAD_DIR / attempt_path
+        print(f"[SERVE FILE] Tentando: {test_path}")
+        exists = test_path.exists()
+        print(f"[SERVE FILE] Existe? {exists}")
+        if exists:
+            full_path = test_path
+            print(f"[SERVE FILE] ✓✓✓ ARQUIVO ENCONTRADO! ✓✓✓")
+            sys.stdout.flush()
+            break
+        sys.stdout.flush()
+    
+    # Se não encontrou, listar arquivos para debug
+    if full_path is None:
+        if '/' in normalized_path:
+            music_dir = UPLOAD_DIR / normalized_path.split('/')[0]
+        else:
+            music_dir = UPLOAD_DIR
+            
+        if music_dir.exists():
+            files = list(music_dir.iterdir())
+            print(f"[SERVE FILE] Arquivos encontrados em {music_dir}:")
+            for f in files[:10]:
+                print(f"  - {f.name}")
+            sys.stdout.flush()
+        
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Arquivo não encontrado. Tentado: {paths_to_try}"
+        )
+    
+    # Verificar se está dentro do diretório de uploads (segurança)
+    try:
+        full_path.resolve().relative_to(UPLOAD_DIR.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    # Determinar content-type baseado na extensão
+    content_type = "application/octet-stream"
+    suffix = full_path.suffix.lower()
+    if suffix in ['.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg', '.opus']:
+        content_type = "audio/mpeg" if suffix == '.mp3' else f"audio/{suffix[1:]}"
+    elif suffix in ['.mp4', '.avi', '.mov', '.mkv', '.webm']:
+        content_type = f"video/{suffix[1:]}"
+    
+    return FileResponse(
+        path=str(full_path),
+        media_type=content_type,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Disposition": f'inline; filename="{full_path.name}"'
+        }
+    )
 
 # Segurança
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -218,21 +330,52 @@ async def upload_musica(
     print(f"=== UPLOAD MÚSICA RECEBIDO ===")
     print(f"{'='*60}")
     print(f"Arquivo: {file.filename}")
+    print(f"Content-Type: {file.content_type}")
     print(f"Título: {titulo}")
     print(f"Artista: {artista}")
     print(f"Usuário: {current_user.username}")
+    print(f"User ID: {getattr(current_user, 'id', 'N/A')}")
     import sys
     sys.stdout.flush()  # Forçar flush para aparecer nos logs
     
-    # Validar extensão - aceitar qualquer áudio
-    # Remove validação de extensão para aceitar qualquer formato
-    # allowed_extensions = {'.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg', '.opus', '.wma', '.amr', '.3gp'}
-    file_ext = Path(file.filename).suffix.lower()
+    # Validar que o arquivo foi enviado
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Arquivo não fornecido")
     
-    # Gerar nome único
+    # Validar campos obrigatórios
+    if not titulo or not titulo.strip():
+        raise HTTPException(status_code=400, detail="Título é obrigatório")
+    if not artista or not artista.strip():
+        raise HTTPException(status_code=400, detail="Artista é obrigatório")
+    
+    # Validar extensão - aceitar qualquer áudio
+    file_ext = Path(file.filename).suffix.lower()
+    print(f"Extensão do arquivo: {file_ext}")
+    
+    # Verificar se o diretório existe e tem permissão de escrita
+    if not MUSICA_DIR.exists():
+        try:
+            MUSICA_DIR.mkdir(parents=True, exist_ok=True)
+            print(f"✓ Diretório criado: {MUSICA_DIR}")
+        except Exception as e:
+            print(f"✗ Erro ao criar diretório: {e}")
+            raise HTTPException(status_code=500, detail=f"Erro ao criar diretório de upload: {str(e)}")
+    
+    # Verificar permissão de escrita
+    if not os.access(MUSICA_DIR, os.W_OK):
+        raise HTTPException(status_code=500, detail="Sem permissão de escrita no diretório de upload")
+    
+    # Gerar nome único - sanitizar nome do arquivo
     timestamp = int(datetime.utcnow().timestamp())
-    safe_filename = f"{timestamp}_{file.filename}"
+    # Remover caracteres problemáticos e codificações URL do nome
+    import urllib.parse
+    decoded_filename = urllib.parse.unquote(file.filename)  # Decodificar se já estiver encoded
+    # Sanitizar: remover caracteres especiais, manter apenas alfanuméricos, espaços, hífens, underscores e pontos
+    safe_name = ''.join(c if c.isalnum() or c in (' ', '-', '_', '.') else '_' for c in decoded_filename)
+    safe_filename = f"{timestamp}_{safe_name}"
     file_path = MUSICA_DIR / safe_filename
+    
+    print(f"Salvando arquivo em: {file_path}")
     
     # Salvar arquivo
     try:
@@ -240,29 +383,51 @@ async def upload_musica(
             shutil.copyfileobj(file.file, buffer)
         
         file_size = file_path.stat().st_size
+        print(f"✓ Arquivo salvo. Tamanho: {file_size} bytes")
+        
+        if file_size == 0:
+            file_path.unlink()
+            raise HTTPException(status_code=400, detail="Arquivo vazio ou corrompido")
         
         # Criar registro no banco
+        user_id = current_user.id if hasattr(current_user, 'id') and current_user.id != "guest" else 1
+        print(f"Criando registro no banco com user_id: {user_id}")
+        
+        # Normalizar caminho para usar barras normais (compatível com URLs)
+        arquivo_path = str(file_path.relative_to(UPLOAD_DIR)).replace('\\', '/')
+        
         nova_musica = Musica(
-            titulo=titulo,
-            artista=artista,
-            album=album,
-            genero=genero,
-            arquivo_path=str(file_path.relative_to(UPLOAD_DIR)),
+            titulo=titulo.strip(),
+            artista=artista.strip(),
+            album=album.strip() if album else None,
+            genero=genero.strip() if genero else None,
+            arquivo_path=arquivo_path,
             tamanho=file_size,
-            uploaded_by=current_user.id if hasattr(current_user, 'id') and current_user.id != "guest" else 1
+            uploaded_by=user_id
         )
         
         db.add(nova_musica)
         db.commit()
         db.refresh(nova_musica)
         
-        print(f"✓ Música uploadada: {nova_musica.titulo}")
+        print(f"✓ Música uploadada com sucesso: {nova_musica.titulo} (ID: {nova_musica.id})")
         return nova_musica
         
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         # Deletar arquivo se falhou
         if file_path.exists():
-            file_path.unlink()
+            try:
+                file_path.unlink()
+                print(f"✗ Arquivo deletado após erro")
+            except:
+                pass
+        
+        print(f"✗ ERRO no upload: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao fazer upload: {str(e)}")
 
 
@@ -339,20 +504,49 @@ async def upload_video(
     print(f"=== UPLOAD VÍDEO RECEBIDO ===")
     print(f"{'='*60}")
     print(f"Arquivo: {file.filename}")
+    print(f"Content-Type: {file.content_type}")
     print(f"Título: {titulo}")
     print(f"Usuário: {current_user.username}")
+    print(f"User ID: {getattr(current_user, 'id', 'N/A')}")
     import sys
     sys.stdout.flush()  # Forçar flush para aparecer nos logs
     
-    # Validar extensão - aceitar qualquer vídeo
-    # Remove validação de extensão para aceitar qualquer formato
-    # allowed_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.3gp'}
-    file_ext = Path(file.filename).suffix.lower()
+    # Validar que o arquivo foi enviado
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Arquivo não fornecido")
     
-    # Gerar nome único
+    # Validar campos obrigatórios
+    if not titulo or not titulo.strip():
+        raise HTTPException(status_code=400, detail="Título é obrigatório")
+    
+    # Validar extensão - aceitar qualquer vídeo
+    file_ext = Path(file.filename).suffix.lower()
+    print(f"Extensão do arquivo: {file_ext}")
+    
+    # Verificar se o diretório existe e tem permissão de escrita
+    if not VIDEO_DIR.exists():
+        try:
+            VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+            print(f"✓ Diretório criado: {VIDEO_DIR}")
+        except Exception as e:
+            print(f"✗ Erro ao criar diretório: {e}")
+            raise HTTPException(status_code=500, detail=f"Erro ao criar diretório de upload: {str(e)}")
+    
+    # Verificar permissão de escrita
+    if not os.access(VIDEO_DIR, os.W_OK):
+        raise HTTPException(status_code=500, detail="Sem permissão de escrita no diretório de upload")
+    
+    # Gerar nome único - sanitizar nome do arquivo
     timestamp = int(datetime.utcnow().timestamp())
-    safe_filename = f"{timestamp}_{file.filename}"
+    # Remover caracteres problemáticos e codificações URL do nome
+    import urllib.parse
+    decoded_filename = urllib.parse.unquote(file.filename)  # Decodificar se já estiver encoded
+    # Sanitizar: remover caracteres especiais, manter apenas alfanuméricos, espaços, hífens, underscores e pontos
+    safe_name = ''.join(c if c.isalnum() or c in (' ', '-', '_', '.') else '_' for c in decoded_filename)
+    safe_filename = f"{timestamp}_{safe_name}"
     file_path = VIDEO_DIR / safe_filename
+    
+    print(f"Salvando arquivo em: {file_path}")
     
     # Salvar arquivo
     try:
@@ -360,28 +554,50 @@ async def upload_video(
             shutil.copyfileobj(file.file, buffer)
         
         file_size = file_path.stat().st_size
+        print(f"✓ Arquivo salvo. Tamanho: {file_size} bytes")
+        
+        if file_size == 0:
+            file_path.unlink()
+            raise HTTPException(status_code=400, detail="Arquivo vazio ou corrompido")
         
         # Criar registro no banco
+        user_id = current_user.id if hasattr(current_user, 'id') and current_user.id != "guest" else 1
+        print(f"Criando registro no banco com user_id: {user_id}")
+        
+        # Normalizar caminho para usar barras normais (compatível com URLs)
+        arquivo_path = str(file_path.relative_to(UPLOAD_DIR)).replace('\\', '/')
+        
         novo_video = Video(
-            titulo=titulo,
-            descricao=descricao,
-            categoria=categoria,
-            arquivo_path=str(file_path.relative_to(UPLOAD_DIR)),
+            titulo=titulo.strip(),
+            descricao=descricao.strip() if descricao else None,
+            categoria=categoria.strip() if categoria else None,
+            arquivo_path=arquivo_path,
             tamanho=file_size,
-            uploaded_by=current_user.id if hasattr(current_user, 'id') and current_user.id != "guest" else 1
+            uploaded_by=user_id
         )
         
         db.add(novo_video)
         db.commit()
         db.refresh(novo_video)
         
-        print(f"✓ Vídeo uploadado: {novo_video.titulo}")
+        print(f"✓ Vídeo uploadado com sucesso: {novo_video.titulo} (ID: {novo_video.id})")
         return novo_video
         
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         # Deletar arquivo se falhou
         if file_path.exists():
-            file_path.unlink()
+            try:
+                file_path.unlink()
+                print(f"✗ Arquivo deletado após erro")
+            except:
+                pass
+        
+        print(f"✗ ERRO no upload: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao fazer upload: {str(e)}")
 
 
@@ -457,4 +673,13 @@ def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Configurações para aceitar arquivos grandes (até 100MB)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        limit_concurrency=100,
+        limit_max_requests=1000,
+        timeout_keep_alive=300,  # 5 minutos
+    )

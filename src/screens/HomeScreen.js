@@ -51,12 +51,21 @@ export default function HomeScreen({ navigation }) {
   };
 
   const playMusica = (musica) => {
+    // Normalizar caminho - NÃO fazer encoding se já contém % (arquivo pode ter %20 literal)
+    const normalizedPath = musica.arquivo_path.replace(/\\/g, '/');
+    
+    // Se o caminho já contém % (como %20), usar diretamente sem encoding adicional
+    // Isso evita double-encoding que causaria 404
+    const fileUrl = normalizedPath.includes('%') 
+      ? `${API_BASE}/uploads/${normalizedPath}`
+      : `${API_BASE}/uploads/${normalizedPath.split('/').map(segment => encodeURIComponent(segment)).join('/')}`;
+    
     const track = {
       videoId: musica.id.toString(),
       title: musica.titulo,
       channel: musica.artista,
       thumbnail: null,
-      fileUrl: `${API_BASE}/uploads/${musica.arquivo_path}`
+      fileUrl: fileUrl
     };
     playNow(track);
     navigation.navigate('MusicPlayer', { 
@@ -66,12 +75,21 @@ export default function HomeScreen({ navigation }) {
   };
 
   const playVideo = (video) => {
+    // Normalizar caminho - NÃO fazer encoding se já contém % (arquivo pode ter %20 literal)
+    const normalizedPath = video.arquivo_path.replace(/\\/g, '/');
+    
+    // Se o caminho já contém % (como %20), usar diretamente sem encoding adicional
+    // Isso evita double-encoding que causaria 404
+    const fileUrl = normalizedPath.includes('%') 
+      ? `${API_BASE}/uploads/${normalizedPath}`
+      : `${API_BASE}/uploads/${normalizedPath.split('/').map(segment => encodeURIComponent(segment)).join('/')}`;
+    
     const track = {
       videoId: video.id.toString(),
       title: video.titulo,
       channel: video.descricao || 'Sem descrição',
       thumbnail: null,
-      fileUrl: `${API_BASE}/uploads/${video.arquivo_path}`
+      fileUrl: fileUrl
     };
     playNow(track);
     navigation.navigate('VideoPlayer', { 
